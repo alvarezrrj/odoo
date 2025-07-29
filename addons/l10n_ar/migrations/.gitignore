@@ -1,0 +1,12 @@
+# Migration script cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Migration test files
+test_migration_*
+migration_test_*
+
+# Temporary files
+*.tmp
+*.bak
