@@ -1,0 +1,92 @@
+---Fields added on existing models---
+
+account.account:
+- non_trade: selection (new field added to template CSV files)
+
+account.chart.template:
+- force_create: parameter added to _load method
+- try_loading: new method added
+
+---Fields removed on existing models---
+
+res.partner:
+- l10n_ar_special_purchase_document_type_ids: many2many relation to l10n_latam.document.type (field deprecated and removed)
+
+account.move:
+- l10n_ar_currency_rate: float field (copy=False, readonly=True) - removed along with _set_afip_rate method
+
+---Dependencies and manifest changes---
+
+l10n_ar module (__manifest__.py):
+- Added 'account' to dependencies list
+- Added 'auto_install': ['account'] configuration
+- Updated website URL from 17.0 to master documentation
+
+---Data template changes---
+
+account.account CSV templates:
+- ar_base: Added 'non_trade' column with empty values for all 225 account records
+- ar_ri: Added 'non_trade' column with empty values for all account records
+
+account.tax CSV templates:
+- ar_base: Various tax rate and configuration updates
+- ar_ex: Various tax rate and configuration updates  
+- ar_ri: Various tax rate and configuration updates
+
+---Business logic changes---
+
+res.partner validation:
+- Enhanced CUIT validation with new InvalidComponent exception handling
+- Added specific validation for CUIT prefix requirements (20, 23, 24, 27, 30, 33, 34, 50, 51, 55)
+
+account.chart.template:
+- Added error handling for CUIT validation during chart template loading
+- Added try_loading method to automatically select template based on AFIP responsibility type
+- Enhanced _load method with force_create parameter and validation error handling
+
+l10n_ar_afip_concept field:
+- Updated help text to remove reference to forcing different types
+- Simplified description
+
+account.move product type logic:
+- Updated consumable type detection logic (changed from set(['consu', 'product']) to {'consu'})
+- Removed 'product' type from consumable classification
+
+---XML data changes---
+
+res_partner_data.xml:
+- Removed l10n_ar_special_purchase_document_type_ids field assignment from ADHOC partner record
+
+---Translation updates---
+
+i18n files:
+- Updated es_419.po and l10n_ar.pot with new translation strings
+- Added new error messages for enhanced validations
+
+---View updates---
+
+Several view files updated:
+- l10n_ar_afip_responsibility_type_view.xml
+- l10n_latam_document_type_view.xml  
+- res_country_view.xml
+- res_partner_view.xml
+- uom_uom_view.xml
+- report_invoice.xml
+
+---Model updates without schema changes---
+
+Updated models (business logic only):
+- account_fiscal_position.py
+- account_journal.py
+- account_move.py
+- account_move_line.py
+- template_ar_base.py
+- template_ar_ex.py
+- template_ar_ri.py
+- invoice_report.py
+
+---Test updates---
+
+Test files updated:
+- common.py
+- test_manual.py

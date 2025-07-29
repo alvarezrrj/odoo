@@ -1,0 +1,183 @@
+OpenUpgrade Migration Plan for l10n_ar module from 17.0 to 18.0
+================================================================
+
+OVERVIEW
+--------
+The l10n_ar module has several changes that require careful migration handling.
+Main areas of change:
+- Field removal (l10n_ar_special_purchase_document_type_ids)
+- New account field (non_trade)
+- Enhanced validation logic
+- Dependencies and auto-install changes
+- Data template updates
+
+MIGRATION STEPS
+---------------
+
+1. FIELD REMOVAL - res.partner.l10n_ar_special_purchase_document_type_ids
+   
+   ANALYSIS: This many2many field has been marked as deprecated and completely removed.
+   
+   ACTION REQUIRED:
+   - Use openupgradelib.openupgrade.drop_columns() to remove the field
+   - Check if any custom modules depend on this field before removal
+   - Manual step: Review any custom code that may reference this field
+   
+   CODE:
+   ```python
+   from openupgradelib import openupgrade
+   
+   @openupgrade.migrate()
+   def migrate(env, version):
+       # Drop deprecated field column and relation table
+       openupgrade.drop_columns(env.cr, [
+           ('res_partner', 'l10n_ar_special_purchase_document_type_ids')
+       ])
+       
+       # Drop the many2many relation table if it exists
+       if openupgrade.table_exists(env.cr, 'res_partner_document_type_rel'):
+           openupgrade.drop_table(env.cr, 'res_partner_document_type_rel')
+   ```
+
+1.2. FIELD REMOVAL - account.move.l10n_ar_currency_rate
+
+   ANALYSIS: This float field has been removed along with the _set_afip_rate method.
+   
+   ACTION REQUIRED:
+   - Use openupgradelib.openupgrade.drop_columns() to remove the field
+   - Check if any custom modules or reports use this field
+   - Manual step: Review any custom code that references this field or _set_afip_rate method
+   
+   CODE:
+   ```python
+   from openupgradelib import openupgrade
+   
+   @openupgrade.migrate()
+   def migrate(env, version):
+       # Drop deprecated field
+       openupgrade.drop_columns(env.cr, [
+           ('account_move', 'l10n_ar_currency_rate')
+       ])
+   ```
+
+3. NEW FIELD ADDITION - account.account.non_trade
+   
+   ANALYSIS: A new 'non_trade' field has been added to account.account model.
+   Based on CSV templates, it appears to be a selection or boolean field with empty default values.
+   
+   ACTION REQUIRED:
+   - Field will be created automatically by Odoo during module update
+   - No migration code needed as default values are empty/False
+   - Verify field is properly added and accessible
+
+4. MODULE DEPENDENCIES UPDATE
+   
+   ANALYSIS: Module now explicitly depends on 'account' and has auto_install configuration.
+   
+   ACTION REQUIRED:
+   - Update module dependencies in __manifest__.py
+   - Configure auto_install to depend on 'account' module
+   - No migration code needed - handled by manifest update
+
+5. DATA TEMPLATE UPDATES
+   
+   ANALYSIS: CSV templates have been updated with new column and various data changes.
+   
+   ACTION REQUIRED:
+   - Templates will be updated automatically during module upgrade
+   - Review new account.tax configurations for correctness
+   - Verify account.account templates load correctly with new non_trade column
+
+6. ENHANCED VALIDATION LOGIC
+   
+   ANALYSIS: CUIT validation has been enhanced with better error handling.
+   
+   ACTION REQUIRED:
+   - New validation will be active immediately after upgrade
+   - Test existing partner records to ensure they pass new validation
+   - Manual step: Review and fix any partners with invalid CUIT numbers
+   
+   VALIDATION CODE TO RUN POST-MIGRATION:
+   ```python
+   # Validate existing partner CUIT numbers
+   partners = env['res.partner'].search([
+       ('l10n_latam_identification_type_id.name', '=', 'CUIT'),
+       ('vat', '!=', False)
+   ])
+   
+   for partner in partners:
+       try:
+           partner._validate_l10n_latam_identification()
+       except ValidationError as e:
+           # Log partners that fail new validation
+           _logger.warning(f"Partner {partner.id} ({partner.name}) has invalid CUIT: {e}")
+   ```
+
+7. CHART TEMPLATE LOADING CHANGES
+   
+   ANALYSIS: Chart template loading has new try_loading method and enhanced error handling.
+   
+   ACTION REQUIRED:
+   - No migration code needed - methods are backwards compatible
+   - New functionality will be available for new companies
+   - Existing companies are not affected
+
+MANUAL STEPS REQUIRED
+--------------------
+
+1. **Pre-migration checks:**
+   - Identify any custom modules that reference l10n_ar_special_purchase_document_type_ids
+   - Identify any custom modules that reference l10n_ar_currency_rate field or _set_afip_rate method
+   - Backup data from res_partner_document_type_rel table if custom logic depends on it
+   - Document current usage of the deprecated fields
+
+2. **Post-migration validation:**
+   - Run CUIT validation on existing partners (see code above)
+   - Verify new account.account.non_trade field is properly added
+   - Test chart template loading for new AR companies
+   - Verify tax configurations are correctly updated
+
+3. **Custom module updates:**
+   - Update any custom modules that extend res.partner to remove references to deprecated field
+   - Update custom views that may display the deprecated field
+   - Update custom reports or exports that include the deprecated field
+
+TESTING CHECKLIST
+-----------------
+
+□ Verify l10n_ar module loads without errors after migration
+□ Check that res.partner no longer has l10n_ar_special_purchase_document_type_ids field
+□ Check that account.move no longer has l10n_ar_currency_rate field
+□ Verify account.account has new non_trade field
+□ Test CUIT validation with valid and invalid numbers
+□ Test chart template loading for new AR companies
+□ Verify existing AR companies continue to work normally
+□ Check that taxes are correctly configured after template updates
+□ Test document type validation with enhanced error messages
+□ Verify AFIP concept computation works correctly with updated product type logic
+
+DEPENDENCIES TO INSTALL
+-----------------------
+- openupgradelib (for drop_columns and other utilities)
+
+ESTIMATED MIGRATION TIME
+-----------------------
+- Automated migration: 5-10 minutes
+- Manual validation and testing: 30-60 minutes
+- Custom module updates: Variable (depends on customizations)
+
+ROLLBACK PLAN
+------------
+If issues occur:
+1. Restore database from pre-migration backup
+2. Fix any identified issues with custom modules
+3. Re-run migration with fixes
+
+NOTES
+-----
+- The l10n_ar_special_purchase_document_type_ids field was marked as deprecated, so removal was expected
+- The l10n_ar_currency_rate field was removed as part of currency handling simplification
+- Most changes are additive and should not break existing functionality
+- Enhanced validation may catch previously invalid data - review and fix as needed
+- Demo data changes are ignored as instructed
+- Product type logic changes in AFIP concept computation may affect invoice classification
