@@ -1,0 +1,279 @@
+# l10n_ar Module Migration Work Plan: OpenUpgrade 17.0 → 18.0
+
+## Migration Overview
+This document provides a detailed action plan for migrating the l10n_ar module from Odoo 17.0 to 18.0. The migration involves field removals, dependency updates, and UI modernization while maintaining full backward compatibility.
+
+## Pre-Migration Preparation
+
+### 1. Backup and Safety Measures
+```python
+# Ensure database backup before migration
+# Test migration on staging environment first
+# Verify all l10n_ar dependent modules are compatible
+```
+
+### 2. Dependency Check
+```python
+# modules to verify compatibility:
+# - l10n_ar_pos
+# - l10n_ar_website_sale  
+# - l10n_ar_withholding
+# - Any custom modules extending l10n_ar
+```
+
+## Migration Steps
+
+### Step 1: Handle Field Removals (Pre-Migration Script)
+
+#### 1.1 Remove Deprecated Fields
+```python
+def migrate(cr, version):
+    """Pre-migration script for l10n_ar module"""
+    
+    # Drop deprecated field from res.partner
+    openupgradelib.drop_columns(cr, [
+        ('res_partner', 'l10n_ar_special_purchase_document_type_ids'),
+    ])
+    
+    # Drop Many2many relation table
+    openupgradelib.drop_columns(cr, [
+        ('res_partner_document_type_rel', None),  # Drop entire table
+    ])
+    
+    # Drop currency rate field from account.move
+    openupgradelib.drop_columns(cr, [
+        ('account_move', 'l10n_ar_currency_rate'),
+    ])
+```
+
+#### 1.2 Clean Up Related Data
+```python
+def clean_partner_data(cr):
+    """Remove deprecated field references from partner data"""
+    # Remove any remaining references to l10n_ar_special_purchase_document_type_ids
+    # This field was marked as deprecated and no longer needed
+    pass  # Field was already removed in pre-migration
+```
+
+### Step 2: Update Manifest Dependencies (Post-Migration)
+
+#### 2.1 Verify Auto-Install Configuration
+```python
+def verify_auto_install(cr, version):
+    """Ensure module auto-installs correctly with account module"""
+    # The new auto_install configuration should work automatically
+    # No code changes needed - handled by module upgrade
+    pass
+```
+
+### Step 3: Handle Model Changes
+
+#### 3.1 Account Move Model Updates
+```python
+def update_account_move_logic(cr, version):
+    """Update account.move model logic for v18.0"""
+    
+    # Note: The consumable type change from {'consu', 'product'} to {'consu'}
+    # is handled automatically by the new code
+    # No data migration needed as it's a logic change only
+    
+    # Currency rate handling is now managed by standard Odoo mechanisms
+    # No migration needed as the field is simply removed
+    pass
+```
+
+#### 3.2 Partner Validation Updates
+```python
+def update_partner_validation(cr, version):
+    """Enhanced CUIT validation is automatic with new code"""
+    # New InvalidComponent exception handling is backward compatible
+    # No migration script needed
+    pass
+```
+
+### Step 4: Update Demo Data References
+
+#### 4.1 Company External ID Migration
+```python
+def migrate_demo_company_refs(cr, version):
+    """Update demo data company references"""
+    
+    company_mappings = {
+        'l10n_ar.company_mono': 'base.company_mono',
+        'l10n_ar.company_exento': 'base.company_exento', 
+        'l10n_ar.company_ri': 'base.company_ri',
+    }
+    
+    for old_ref, new_ref in company_mappings.items():
+        # Update ir.model.data records
+        cr.execute("""
+            UPDATE ir_model_data 
+            SET module = 'base', name = %s
+            WHERE module = 'l10n_ar' AND name = %s
+        """, (new_ref.split('.')[1], old_ref.split('.')[1]))
+```
+
+### Step 5: View Updates (Automatic)
+
+#### 5.1 Tree to List Migration
+```xml
+<!-- These changes are handled automatically by the module update -->
+<!-- Views will be updated from <tree> to <list> elements -->
+<!-- View names will change from "*.tree" to "*.list" -->
+<!-- No manual intervention required -->
+```
+
+### Step 6: Data Template Updates
+
+#### 6.1 Chart of Account CSV Updates
+```python
+def update_chart_data(cr, version):
+    """Chart of account CSV updates are handled by data loading"""
+    # The new CSV files will be automatically loaded
+    # Account structure remains the same, only formatting improved
+    # No custom migration needed
+    pass
+```
+
+## Post-Migration Validation
+
+### 1. Functional Testing Checklist
+
+#### 1.1 Core Functionality Tests
+- [ ] Create invoice with different AFIP responsibility types
+- [ ] Verify VAT calculation and tax groups work correctly  
+- [ ] Test AFIP concept computation (products vs services)
+- [ ] Validate CUIT number format with new validation rules
+- [ ] Check chart of account installation for all responsibility types
+
+#### 1.2 Demo Data Validation
+- [ ] Verify demo companies load correctly with new references
+- [ ] Test demo invoices and transactions work properly
+- [ ] Confirm all demo partners have correct AFIP responsibility types
+
+#### 1.3 Integration Testing  
+- [ ] Test with l10n_ar_pos module
+- [ ] Test with l10n_ar_website_sale module
+- [ ] Test with l10n_ar_withholding module
+- [ ] Verify custom modules extending l10n_ar still work
+
+### 2. Database Health Checks
+
+#### 2.1 Orphaned Data Check
+```sql
+-- Check for any remaining references to removed fields
+SELECT * FROM ir_model_fields 
+WHERE name IN ('l10n_ar_currency_rate', 'l10n_ar_special_purchase_document_type_ids')
+AND model IN ('account.move', 'res.partner');
+
+-- Should return no results after migration
+```
+
+#### 2.2 Company Data Validation
+```sql
+-- Verify company references updated correctly
+SELECT module, name FROM ir_model_data 
+WHERE name IN ('company_mono', 'company_exento', 'company_ri');
+
+-- Should show module = 'base' for all entries
+```
+
+## Migration Script Template
+
+### Complete Migration Script
+```python
+# migrations/18.0.1.0.0/pre-migrate.py
+from openupgradelib import openupgrade
+
+def migrate(cr, version):
+    """Pre-migration script for l10n_ar 17.0 → 18.0"""
+    
+    # Remove deprecated fields
+    openupgrade.drop_columns(cr, [
+        ('res_partner', 'l10n_ar_special_purchase_document_type_ids'),
+        ('account_move', 'l10n_ar_currency_rate'),
+    ])
+    
+    # Clean up relation table  
+    cr.execute("DROP TABLE IF EXISTS res_partner_document_type_rel CASCADE")
+```
+
+```python
+# migrations/18.0.1.0.0/post-migrate.py
+from openupgradelib import openupgrade
+
+def migrate(cr, version):
+    """Post-migration script for l10n_ar 17.0 → 18.0"""
+    
+    # Update company external ID references
+    company_mappings = [
+        ('l10n_ar', 'company_mono', 'base', 'company_mono'),
+        ('l10n_ar', 'company_exento', 'base', 'company_exento'),
+        ('l10n_ar', 'company_ri', 'base', 'company_ri'),
+    ]
+    
+    for old_module, old_name, new_module, new_name in company_mappings:
+        cr.execute("""
+            UPDATE ir_model_data 
+            SET module = %s, name = %s
+            WHERE module = %s AND name = %s
+        """, (new_module, new_name, old_module, old_name))
+```
+
+## Manual Tasks
+
+### 1. Documentation Updates
+- [ ] Update any custom documentation referencing removed fields
+- [ ] Review integration guides for partner special document types
+- [ ] Update developer documentation about currency rate handling
+
+### 2. Custom Module Updates
+- [ ] Review custom modules using `l10n_ar_currency_rate` field
+- [ ] Update custom code referencing `l10n_ar_special_purchase_document_type_ids`
+- [ ] Test custom AFIP integrations with new validation logic
+
+### 3. User Training
+- [ ] Inform users about removed partner special document types feature
+- [ ] Train users on new CUIT validation error messages
+- [ ] Update user manuals for any UI changes
+
+## Risk Assessment
+
+### Low Risk Changes
+- View name changes (tree → list)
+- Demo data reference updates  
+- Chart of account CSV formatting
+- Help text modifications
+
+### Medium Risk Changes
+- Currency rate field removal (check custom reports)
+- AFIP concept computation logic change
+- Enhanced CUIT validation
+
+### High Risk Changes  
+- Partner special purchase document types removal
+- Dependency and auto-install changes
+
+## Rollback Plan
+
+### Emergency Rollback Procedure
+1. Restore database from pre-migration backup
+2. Reinstall l10n_ar version 17.0
+3. Verify all functionality restored
+4. Document issues encountered for future migration attempts
+
+### Partial Rollback (Not Recommended)
+- Field removal cannot be easily rolled back
+- Database structure changes are permanent
+- Full rollback required if issues occur
+
+## Success Criteria
+
+### Migration Successful When:
+- [ ] All tests pass in target environment
+- [ ] No data loss or corruption detected
+- [ ] All dependent modules function correctly
+- [ ] Performance remains acceptable
+- [ ] User acceptance testing completed
+- [ ] Documentation updated
+- [ ] Training completed
