@@ -1,0 +1,151 @@
+---
+# HR Expense Module Upgrade Analysis
+# Migration from 17.0 to 18.0
+
+This document analyzes the differences between the hr_expense module in Odoo 17.0 and 18.0 branches.
+
+## Module Structure Changes
+
+### Added Files:
+- addons/hr_expense/controllers/__init__.py
+- addons/hr_expense/controllers/webmanifest.py
+- addons/hr_expense/data/hr_expense_tour.xml
+- addons/hr_expense/i18n/ku.po (Kurdish translation)
+- addons/hr_expense/static/src/js/web/activity_menu_patch.js
+- addons/hr_expense/static/tests/tours/expense_form_in_sheet_tours.js
+
+### Removed Files:
+- addons/hr_expense/models/account_journal_dashboard.py
+- addons/hr_expense/views/account_journal_dashboard.xml
+- addons/hr_expense/tests/test_account_journal_dashboard.py
+- addons/hr_expense/tests/test_expenses_multi_company.py
+- addons/hr_expense/tests/test_expenses_standard_price_update_warning.py
+- addons/hr_expense/tests/test_expenses_tax.py
+- addons/hr_expense/i18n/hy.po (Armenian translation)
+- addons/hr_expense/i18n/sr.po (Serbian translation)
+- addons/hr_expense/static/tests/mobile/expense_mobile_tests.js
+
+### Modified Files:
+- addons/hr_expense/__manifest__.py
+- addons/hr_expense/models/__init__.py
+- Multiple model files with significant changes
+
+## Manifest Changes (__manifest__.py)
+
+### Data Files:
+- ADDED: 'data/hr_expense_tour.xml' (new tour configuration)
+- REMOVED: 'views/account_journal_dashboard.xml'
+
+### Assets Changes:
+- ADDED: 'hr_expense/static/src/js/web/*.js' to web.assets_backend
+- ADDED: 'hr_expense/static/tests/tours/expense_form_in_sheet_tours.js' to web.assets_tests
+- REMOVED: All 'web.qunit_suite_tests' and 'web.qunit_mobile_suite_tests' assets
+
+### Dependencies:
+- No changes to module dependencies
+
+## Model Changes
+
+### Removed Models:
+- account.journal (hr_expense extension) - account_journal_dashboard.py functionality removed
+  - Methods removed: _prepare_expense_sheet_data_domain(), _get_expense_to_pay_query(), 
+    _fill_sale_purchase_dashboard_data(), open_expenses_action()
+
+### Field Changes in hr.expense:
+- ADDED: vendor_id (Many2one to res.partner) - New vendor field for expense tracking
+- ADDED: same_receipt_expense_ids (Many2many to hr.expense, computed) - For duplicate warnings
+- MODIFIED: payment_mode - Now required=True (was optional before)
+
+### Field Changes in hr.expense.sheet:
+- ADDED: accounting_date (Date field) - For vendor bill date specification
+
+### Method Changes in hr.expense:
+- ADDED: _set_expense_currency_rate() - New currency rate handling
+- ADDED: _compute_same_receipt_expense_ids() - Compute method for duplicate detection
+- ADDED: create() - Override with enhanced validation
+- ADDED: get_expense_attachments() - New attachment retrieval method
+- ADDED: check_amount_not_zero() - Validation method
+- ADDED: action_show_same_receipt_expense_ids() - Action for duplicate warnings
+- MODIFIED: _prepare_base_line_for_taxes_computation() - Replaces _convert_to_tax_base_line_dict()
+- MODIFIED: Multiple methods now use vendor_id for partner information
+
+### Modified Models (Significant changes in):
+- hr.expense (388 insertions, 126 deletions)
+- hr.expense.sheet (219 insertions, 92 deletions)
+- account_move.py, account_payment.py, and other related models
+
+## New Features
+
+### Controllers:
+- NEW: WebManifest controller for PWA support with file sharing capability
+  - Supports image/* and application/pdf file types
+  - Implements share_target for external media sharing
+
+### JavaScript Enhancements:
+- NEW: Activity menu patch for mobile responsiveness
+  - Switches expense views to kanban on mobile devices
+  - Applies to hr.expense.sheet and hr.expense models
+
+### Tours:
+- NEW: Basic hr_expense_tour configuration
+
+## Removed Features
+
+### Account Journal Dashboard:
+- Removed expense-related dashboard functionality from account.journal
+- Removed methods: _prepare_expense_sheet_data_domain, _get_expense_to_pay_query, 
+  _fill_sale_purchase_dashboard_data, open_expenses_action
+- Impact: Journal dashboard no longer shows expense data
+
+### Testing:
+- Removed mobile-specific test suite
+- Removed several test files for multi-company, standard price updates, and tax handling
+
+## Translation Changes
+
+### Added Translations:
+- Kurdish (ku.po)
+
+### Removed Translations:
+- Armenian (hy.po) 
+- Serbian (sr.po)
+
+## Data Changes
+
+### Product Data Updates:
+- Default expense product name changed from "Others" to "Expenses" (product_product_no_cost)
+
+## View Changes
+
+### Significant View Modifications:
+- hr_expense_views.xml: 768 lines changed (major view restructuring)
+- res_config_settings_views.xml: Configuration view updates
+- hr_department_views.xml: Department view enhancements  
+- mail_activity_views.xml: Activity view modifications
+- REMOVED: account_journal_dashboard.xml (entire file and functionality)
+
+## Security Changes
+
+### Access Rights:
+- No changes to ir.model.access.csv
+- Security rules (ir_rule.xml) may have modifications to support new fields
+
+## MIGRATION IMPACT SUMMARY
+
+### High Impact Changes:
+1. **vendor_id field addition** - Requires database schema update and potential data migration
+2. **payment_mode now required** - May need data cleanup for existing records
+3. **Account journal dashboard removal** - Custom code using these methods will break
+4. **Method signature changes** - Custom extensions may need updates
+
+### Medium Impact Changes:
+1. **New mobile responsiveness** - May affect custom mobile views
+2. **PWA functionality** - New sharing capabilities may need configuration
+3. **View restructuring** - Custom view inheritance may need adjustment
+
+### Low Impact Changes:
+1. **Translation updates** - Standard language file maintenance
+2. **Tour additions** - New user guidance features
+3. **Product name change** - Minor data update
+
+---

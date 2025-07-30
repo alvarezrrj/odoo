@@ -1,0 +1,207 @@
+---
+# HR Expense Module Migration Work Plan
+# Odoo 17.0 to 18.0 Upgrade
+
+This document provides a detailed action plan for migrating the hr_expense module from 17.0 to 18.0.
+
+## PRE-MIGRATION ACTIONS
+
+### 1. Database Backup and Preparation
+- [ ] Create full database backup before starting migration
+- [ ] Document current hr_expense module customizations
+- [ ] Identify custom views, reports, or extensions that inherit from hr_expense models
+
+### 2. Field Migration Preparation
+
+#### New Fields to Add:
+```python
+# In hr.expense model:
+vendor_id = fields.Many2one('res.partner', string="Vendor")
+same_receipt_expense_ids = fields.Many2many('hr.expense', compute='_compute_same_receipt_expense_ids')
+
+# In hr.expense.sheet model:
+accounting_date = fields.Date(string="Expense Report Date", help="Specify the bill date of the related vendor bill.")
+```
+
+#### Field Modifications:
+```python
+# In hr.expense model:
+payment_mode - Add required=True constraint
+```
+
+## MIGRATION SCRIPTS
+
+### 1. Database Schema Updates
+
+#### Add New Columns:
+```sql
+-- Add vendor_id field to hr_expense table
+ALTER TABLE hr_expense ADD COLUMN vendor_id INTEGER;
+ALTER TABLE hr_expense ADD CONSTRAINT hr_expense_vendor_id_fkey 
+    FOREIGN KEY (vendor_id) REFERENCES res_partner(id) ON DELETE set null;
+
+-- Add accounting_date field to hr_expense_sheet table  
+ALTER TABLE hr_expense_sheet ADD COLUMN accounting_date DATE;
+
+-- Update payment_mode to be required (existing records should have values)
+-- Note: Check for NULL values before adding NOT NULL constraint
+UPDATE hr_expense SET payment_mode = 'own_account' WHERE payment_mode IS NULL;
+ALTER TABLE hr_expense ALTER COLUMN payment_mode SET NOT NULL;
+```
+
+### 2. Data Migration
+
+#### Initialize New Fields:
+```python
+def migrate_vendor_data(env):
+    """
+    Initialize vendor_id field based on existing data patterns.
+    This may need customization based on business requirements.
+    """
+    expenses = env['hr.expense'].search([('vendor_id', '=', False)])
+    for expense in expenses:
+        # Example logic - customize as needed:
+        # If expense has supplier info in description or other fields
+        # Set vendor_id accordingly, or leave blank for user to fill
+        pass
+
+def migrate_accounting_dates(env):
+    """
+    Initialize accounting_date field for existing expense sheets.
+    """
+    sheets = env['hr.expense.sheet'].search([('accounting_date', '=', False)])
+    for sheet in sheets:
+        # Set accounting_date to date if available, or leave for user input
+        if sheet.date:
+            sheet.accounting_date = sheet.date
+```
+
+### 3. Remove Obsolete Features
+
+#### Remove Account Journal Dashboard Integration:
+```python
+def remove_journal_dashboard_data(env):
+    """
+    Clean up any data related to the removed journal dashboard functionality.
+    """
+    # Remove any custom actions or menu items related to journal dashboard expenses
+    # This is mainly cleanup - the functionality is removed in code
+    
+    # Check for custom views that may reference the removed methods
+    external_ids_to_check = [
+        # Add any known external IDs that might reference removed functionality
+    ]
+```
+
+## POST-MIGRATION ACTIONS
+
+### 1. View Updates Required
+
+#### Manual Updates for Custom Views:
+- [ ] Update any custom views that inherit from hr_expense forms to include vendor_id field
+- [ ] Remove references to account.journal dashboard expense methods in custom code
+- [ ] Update any custom reports that may have used journal dashboard data
+
+#### Standard View Changes:
+The following views have significant changes and may affect customizations:
+- hr_expense_views.xml (768 lines changed)
+- res_config_settings_views.xml
+- hr_department_views.xml
+- mail_activity_views.xml
+
+### 2. Controller and JavaScript Updates
+
+#### New Controllers:
+- [ ] Verify WebManifest controller works correctly for PWA functionality
+- [ ] Test file sharing capability if used in your environment
+
+#### JavaScript Changes:
+- [ ] Test mobile responsiveness changes (activity menu patch)
+- [ ] Verify expense form tours work correctly
+- [ ] Update any custom JavaScript that may conflict with activity_menu_patch.js
+
+### 3. Security and Access Rights Review
+
+#### Review Security Rules:
+- [ ] Check if new vendor_id field requires specific access rights
+- [ ] Verify existing security rules still work with model changes
+- [ ] Update any custom security rules that reference removed methods
+
+### 4. Translation Updates
+
+#### Language File Updates:
+- [ ] Add Kurdish (ku.po) translation if needed for your instance
+- [ ] Remove Armenian (hy.po) and Serbian (sr.po) if they were customized
+- [ ] Update translations for new fields (vendor_id, accounting_date)
+
+### 5. Testing Requirements
+
+#### Functional Testing:
+- [ ] Test expense creation with new vendor_id field
+- [ ] Verify duplicate expense detection works correctly
+- [ ] Test expense sheet accounting_date functionality
+- [ ] Validate mobile expense views work properly
+- [ ] Test PWA file sharing if enabled
+
+#### Integration Testing:
+- [ ] Test expense approval workflow
+- [ ] Verify accounting integration still works
+- [ ] Test expense reporting functionality
+- [ ] Validate email templates and notifications
+
+#### Regression Testing:
+- [ ] Test all existing expense workflows
+- [ ] Verify custom developments still function
+- [ ] Check expense analytics and reports
+
+## MANUAL INTERVENTIONS REQUIRED
+
+### 1. Business Process Updates
+- [ ] Train users on new vendor_id field usage
+- [ ] Define business rules for vendor selection in expenses
+- [ ] Update expense policies to include vendor requirements if needed
+
+### 2. Custom Code Updates
+- [ ] Update any custom methods that called removed journal dashboard functions
+- [ ] Modify custom expense workflows to handle new vendor_id field
+- [ ] Update custom reports to use new field structure
+
+### 3. Configuration Updates
+- [ ] Review expense categories and ensure they work with new structure
+- [ ] Update expense approval flows if vendor information affects routing
+- [ ] Configure mobile settings if using PWA functionality
+
+## ROLLBACK PLAN
+
+### In Case of Issues:
+1. Restore database backup
+2. Revert to 17.0 module version
+3. Document issues encountered
+4. Plan remediation for identified problems
+
+## VALIDATION CHECKLIST
+
+### Post-Migration Verification:
+- [ ] All expense creation workflows function correctly
+- [ ] Vendor field is properly populated and accessible
+- [ ] Mobile views display correctly
+- [ ] Integration with accounting module works
+- [ ] Custom developments function as expected
+- [ ] Performance is acceptable
+- [ ] All security rules are functioning
+- [ ] Translations are complete and accurate
+
+## NOTES
+
+### Critical Changes to Monitor:
+1. The removal of account.journal dashboard integration may affect custom dashboards
+2. New vendor_id field may require updates to expense policies
+3. Method signature changes in tax computation may affect custom extensions
+4. Mobile view changes may impact user experience
+
+### Development Considerations:
+- The new vendor_id field opens possibilities for enhanced vendor expense tracking
+- PWA capabilities enable better mobile file handling
+- Duplicate expense detection can help prevent fraudulent submissions
+
+---
